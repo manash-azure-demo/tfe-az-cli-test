@@ -1,0 +1,305 @@
+KV TEST:
+
+kubectl config current-context
+
+kubectl config set-context mkd-aks-cls1-eus
+kubectl config set-context mkd-aks-cls2-eus
+
+-- az aks get-credentials --resource-group rg_sb_eastus_221777_1_172950794234 --name mkd-aks-cls1-eus
+-- az aks get-credentials --resource-group rg_sb_eastus_221777_1_172950794234 --name mkd-aks-cls2-eus
+
+---------------keyvault-test-pod.yaml(CREATE THIS FILE IN ANY FOLDER AND RUN BELOW COMMANDS)--------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: keyvault-test
+spec:
+  containers:
+  - name: keyvault-test
+    image: mcr.microsoft.com/azure-cli
+    command: [ "sleep", "3600" ]
+--------------------------------------------------
+
+-- kubectl apply -f keyvault-test-pod.yaml
+-- kubectl exec -it keyvault-test -- /bin/bash
+-- az login --identity --allow-no-subscriptions
+-- az keyvault secret show --vault-name mykeyvaultBe9AXt --name MySecreteuscls1 -- (CHANGE THE KEYVAULT NAME)
+-- az keyvault secret show --vault-name mykeyvaultBe9AXt --name MySecreteuscls2 -- (CHANGE THE KEYVAULT NAME)
+If the command retrieves the secret, then the AKS cluster can access the Key Vault. i.e. "SuperSecretValue"
+
+###########################################################Simple app using public Docker image(without ACR)################################################################
+
+cd E:\gitrepo\tfe-cli-test\aks\aks_cluster-region1\app_test_without_acr
+
+az aks get-credentials --resource-group rg_sb_eastus_221777_1_172950794234 --name mkdaksakscluster1-eus
+
+#### 1. **Create a Docker Image and Push to Docker Hub**
+First, create a simple application, for example, a basic Python app.
+
+**Sample Python App (app.py):**
+==================================
+from flask import Flask
+app = Flask(__name__)
+
+@app.route('/')
+def hello_world():
+    return 'Hello, World MANASH!'
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=80)
+==================================
+
+**Dockerfile:**
+==================================
+# Use the official Python image from the Docker Hub
+FROM python:3.9-slim
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy the current directory contents into the container at /app
+COPY . /app
+
+# Install any needed packages specified in requirements.txt
+RUN pip install flask
+
+# Make port 80 available to the world outside this container
+EXPOSE 80
+
+# Run app.py when the container launches
+CMD ["python", "app.py"]
+==================================
+
+**Build and Push the Docker Image:**
+
+# Build the Docker image
+-- docker build -t manashdas2005/simple-python-app .
+
+# Login to Docker Hub
+-- docker login
+
+# Push the Docker image to Docker Hub
+-- docker push manashdas2005/simple-python-app
+
+#### 3. **Connect to Your AKS Cluster**
+
+az aks get-credentials --resource-group <your-resource-group> --name <your-aks-cluster-name>
+-- az aks get-credentials --resource-group rg_sb_eastus_221777_1_172950794234 --name mkd-aks-cls1-eus
+
+
+#### 4. **Deploy the Application on AKS**
+Create a Kubernetes deployment using the image from Docker Hub.
+
+**Deployment YAML (deployment.yaml):**
+==================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simple-python-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simple-python-app
+  template:
+    metadata:
+      labels:
+        app: simple-python-app
+    spec:
+      containers:
+      - name: simple-python-app
+        image: manashdas2005/simple-python-app:latest
+        ports:
+        - containerPort: 80
+==================================
+
+Apply the deployment:
+
+kubectl apply -f deployment.yaml
+
+#### 5. **Expose the Deployment**
+Expose the deployment as a Kubernetes service.
+
+kubectl expose deployment simple-python-app --type=LoadBalancer --name=simple-python-app-service --port=80 --target-port=80
+
+
+#### 6. **Verify the Pod is Running**
+Check the status of the pods.
+
+kubectl get pods
+
+You should see your pod in the `Running` state.
+
+#### 7. **Access the Application**
+Once the service is up, get the external IP to access your application.
+
+kubectl get service simple-python-app-service
+
+Copy the external IP and open it in your web browser to see the "Hello, World!" message.
+
+This process will confirm that your pod is running successfully in the AKS cluster.
+
+##################################################### Simple app deploy(with ACR) ###############################################################################
+
+
+Simple app using public Docker image(with ACR):
+
+cd E:\gitrepo\tfe-cli-test\aks\aks_cluster-region1\app_test_with_acr
+
+### Step 1: Prepare Your Dockerfile
+
+Ensure that you have a Dockerfile for your application. Here’s a simple example for an NGINX application:
+
+========================================================
+# Use the official NGINX image as the base image
+FROM nginx:latest
+
+# Copy the content to be served by NGINX (e.g., an index.html file)
+COPY . /usr/share/nginx/html
+
+# Expose the port NGINX will listen on
+EXPOSE 80
+========================================================
+
+Place this Dockerfile in your project directory (e.g., `E:\gitrepo\mkdaksapp`).
+
+### Step 2: Build the Docker Image
+
+
+
+Navigate to your project directory and build the Docker image:
+
+cd E:\gitrepo\mkdaksapp
+
+-- docker build -t simple-app .
+
+
+This command builds a Docker image named `simple-app` using the Dockerfile in your current directory.
+
+### Step 3: Tag the Docker Image
+
+Tag the Docker image for your ACR. Replace `<your-acr-name>` with your actual ACR name:
+
+
+-- docker tag simple-app:latest mkdakseusacr.azurecr.io/simple-app:v1
+
+
+### Step 4: Push the Docker Image to ACR
+
+
+Login to your ACR and push the image:
+
+-- az acr login --name mkdakseusacr
+
+-- docker push mkdakseusacr.azurecr.io/simple-app:v1
+
+
+### Step 5: Create a Kubernetes Secret for ACR
+
+-- az acr update -n mkdakseusacr --admin-enabled true
+
+Create a Kubernetes secret to allow AKS to pull the image from ACR:
+
+
+kubectl create secret docker-registry acr-auth \
+    --docker-server=<your-acr-name>.azurecr.io \
+    --docker-username=$(az acr credential show --name <your-acr-name> --query username -o tsv) \
+    --docker-password=$(az acr credential show --name <your-acr-name> --query passwords[0].value -o tsv) \
+    --docker-email=<your-email>
+
+-- kubectl create secret docker-registry acr-auth --docker-server=mkdakseusacr.azurecr.io --docker-username=$(az acr credential show --name mkdakseusacr --query username -o tsv) --docker-password=$(az acr credential show --name mkdakseusacr --query passwords[0].value -o tsv) --docker-email=manashdas2005@gmail.com
+
+
+### Step 6: Update the Kubernetes Deployment YAML
+
+Modify your `simple-app.yaml` file to use the ACR image and the created secret:
+
+===================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simple-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simple-app
+  template:
+    metadata:
+      labels:
+        app: simple-app
+    spec:
+      containers:
+      - name: simple-app
+        image: <your-acr-name>.azurecr.io/simple-app:v1
+        ports:
+        - containerPort: 80
+      imagePullSecrets:
+      - name: acr-auth
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: simple-app-service
+spec:
+  selector:
+    app: simple-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: LoadBalancer
+===================================================
+
+### Step 7: Deploy the Application to AKS
+
+Apply the updated YAML file to your AKS cluster:
+
+
+-- kubectl apply -f simple-app.yaml
+
+
+### Step 8: Verify the Pod Status
+
+Check the status of the pods to ensure they are running:
+
+
+-- kubectl get pods
+
+
+### Step 9: Access the Application
+
+Get the external IP of the service to access your application:
+
+
+-- kubectl get services simple-app-service
+
+
+Once the external IP is available, you can navigate to it in your browser to see the application running.
+
+=======================================================
+Helm App:
+
+# Login to ACR
+az acr login --name mkdakseusacr
+
+# Build the Docker image
+docker build -t mkdakseusacr.azurecr.io/mkdaksapp:v1 .
+
+# Push the Docker image to ACR
+docker push mkdakseusacr.azurecr.io/mkdaksapp:v1
+
+helm create mkdaksapp-chart
+
+cd mkdaksapp-chart
+
+az aks get-credentials --resource-group rg_sb_eastus_221777_1_172950794234 --name mkdaksakscluster1-eus
+
+kubectl config use-context mkd-akscls1-eus
+
+helm install mkdaksapp-release ./mkdaksapp-chart --dry-run --debug
+
+helm install mkdaksapp-release ./mkdaksapp-chart
+
+curl http://<public-ip>
+###########################################################################################

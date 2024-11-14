@@ -1,0 +1,344 @@
+# Provider Configuration
+provider "azurerm" {
+  features {}
+  subscription_id                 = var.subscription_id  # Reference from variables
+  resource_provider_registrations = "none"  # Prevent automatic resource provider registration
+}
+
+# Variables for resource names
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+  default     = "4f6a6eb9-27d0-4ed6-a31c-2bde135e2db6"  # Your subscription ID
+}
+
+##### CHANGE THE RESOURCE GROUP HERE #####
+variable "resource_group" {
+  default = "rg_sb_eastus_221777_1_172658082626"
+}
+
+##### CHANGE 'objectID' FOR POD LEVEL ACCESS, AZ CLI COMMAND TO CHECK THE OBJECT ID IS 'az aks show --resource-group <RESOURCE GROUP> --name mkdaksaks-cls1-eus --query "identityProfile"' or 'az aks show --resource-group <RESOURCE GROUP> --name mkdaksaks-cls1-eus --query "identityProfile.kubeletidentity.objectId"'#####
+
+variable "kubeletidentity_object_id" {
+  default = "26b16183-fa77-44a8-9103-bedaf46d7f56"
+}
+
+variable "tenant_id" {
+  default = "82676786-5bc7-43c6-b8f8-b3ee02b0b5f3"
+}
+
+locals {
+  key_vault_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group}/providers/Microsoft.KeyVault/vaults/${var.key_vault_name}"
+}
+
+##### CHANGE THE RESOURCE GROUP HERE #####
+####variable "key_vault_id" {
+  ####default = "/subscriptions/4f6a6eb9-27d0-4ed6-a31c-2bde135e2db6/resourceGroups/rg_sb_eastus_221777_1_172658082626/Microsoft.KeyVault/vaults/mkdakskvH"
+###}
+
+variable "key_vault_name" {
+  type = string
+  default = "mkdakskvH"
+}
+
+#CHANGE THE LAB USER OBJECT ID HERE
+variable "user_principal_id" {
+  default = "1d999052-aa52-44c0-b301-95866ba972b7"
+}
+
+variable "location" {
+  default = "eastus"
+}
+
+variable "vnet_name" {
+  default = "mkdaksVNet"
+}
+
+variable "subnet1_name" {
+  default = "subnet1"
+}
+
+variable "subnet2_name" {
+  default = "subnet2"
+}
+
+variable "nsg1_name" {
+  default = "mkdaksNSG1"
+}
+
+variable "nsg2_name" {
+  default = "mkdaksNSG2"
+}
+
+variable "route_table_name" {
+  default = "mkdaksrtn1"
+}
+
+variable "aks_name" {
+  default = "mkd-aks-cls1-eus"
+}
+
+variable "acr_name" {
+  default = "mkdaksacreus"
+}
+
+######## Create Virtual Network
+resource "azurerm_virtual_network" "vnet" {
+  name                = var.vnet_name
+  address_space       = ["10.0.0.0/16"]
+  location            = var.location
+  resource_group_name = var.resource_group
+}
+
+# Create Subnets
+resource "azurerm_subnet" "subnet1" {
+  name                 = var.subnet1_name
+  resource_group_name  = var.resource_group
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = ["10.0.1.0/24"]
+}
+
+resource "azurerm_subnet" "subnet2" {
+  name                 = var.subnet2_name
+  resource_group_name  = var.resource_group
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = ["10.0.2.0/24"]
+}
+
+# Create Network Security Groups
+resource "azurerm_network_security_group" "nsg1" {
+  name                = var.nsg1_name
+  location            = var.location
+  resource_group_name = var.resource_group
+}
+
+resource "azurerm_network_security_group" "nsg2" {
+  name                = var.nsg2_name
+  location            = var.location
+  resource_group_name = var.resource_group
+}
+
+# Associate NSGs with Subnets
+resource "azurerm_subnet_network_security_group_association" "nsg_association1" {
+  subnet_id                 = azurerm_subnet.subnet1.id
+  network_security_group_id = azurerm_network_security_group.nsg1.id
+}
+
+resource "azurerm_subnet_network_security_group_association" "nsg_association2" {
+  subnet_id                 = azurerm_subnet.subnet2.id
+  network_security_group_id = azurerm_network_security_group.nsg2.id
+}
+
+# Create Route Table
+resource "azurerm_route_table" "route_table" {
+  name                = var.route_table_name
+  location            = var.location
+  resource_group_name = var.resource_group
+}
+
+# Create Routes
+resource "azurerm_route" "route_to_subnet2" {
+  name                   = "route-to-subnet2"
+  route_table_name       = azurerm_route_table.route_table.name
+  resource_group_name    = var.resource_group
+  address_prefix         = "10.0.2.0/24"
+  next_hop_type          = "VnetLocal"
+}
+
+resource "azurerm_route" "route_to_subnet1" {
+  name                   = "route-to-subnet1"
+  route_table_name       = azurerm_route_table.route_table.name
+  resource_group_name    = var.resource_group
+  address_prefix         = "10.0.1.0/24"
+  next_hop_type          = "VnetLocal"
+}
+
+# Associate Route Table with Subnets
+resource "azurerm_subnet_route_table_association" "route_association1" {
+  subnet_id      = azurerm_subnet.subnet1.id
+  route_table_id = azurerm_route_table.route_table.id
+}
+
+resource "azurerm_subnet_route_table_association" "route_association2" {
+  subnet_id      = azurerm_subnet.subnet2.id
+  route_table_id = azurerm_route_table.route_table.id
+}
+
+# Create AKS Cluster
+resource "azurerm_kubernetes_cluster" "aks1" {
+  name                = var.aks_name
+  location            = var.location
+  resource_group_name = var.resource_group
+  dns_prefix          = "mkdaks"
+  kubernetes_version  = "1.30.1"
+
+  default_node_pool {
+    name       = "default"
+    vm_size    = "Standard_D2as_v4"
+    node_count = 2
+    vnet_subnet_id = azurerm_subnet.subnet1.id
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  network_profile {
+    network_plugin = "azure"
+    service_cidr   = "10.1.0.0/16"
+    dns_service_ip = "10.1.0.10"
+  }
+}
+
+# Add additional node pool
+resource "azurerm_kubernetes_cluster_node_pool" "application" {
+  name                = "application"
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks1.id
+  vm_size            = "Standard_D2as_v4"
+  node_count         = 3
+  vnet_subnet_id     = azurerm_subnet.subnet2.id
+}
+
+# Create Key Vault
+resource "azurerm_key_vault" "key_vault" {
+  name                = var.key_vault_name
+  location            = var.location
+  resource_group_name = var.resource_group
+  sku_name            = "standard"
+  tenant_id           = var.tenant_id
+
+##### ACCESS FOR AKS CLUSTER LEVEL ACCESS WHERE 'azurerm_kubernetes_cluster.aks1.identity[0].principal_id' IS THE objectId FOR CLUSTER #####
+  access_policy {
+    tenant_id = var.tenant_id
+    object_id = azurerm_kubernetes_cluster.aks1.identity[0].principal_id
+    secret_permissions = [
+      "Get",   # Permission to read secrets
+      "List",  # Permission to list secrets
+      "Set",   # Permission to create/update secrets
+    ]
+  }
+
+##### objectId or user_principal_id FOR LAB USER NAME WHICH LOGGED IN ######
+
+ access_policy {
+    tenant_id = var.tenant_id
+    object_id = var.user_principal_id
+    secret_permissions = [
+      "Get",
+      "List",
+      "Set",
+      "Delete"
+    ]
+  }
+
+ access_policy {
+  tenant_id = var.tenant_id
+  object_id = var.kubeletidentity_object_id  
+  secret_permissions = [
+    "Get",
+    "List",
+    "Set",
+  ]
+}
+}
+
+# Create Azure Container Registry
+resource "azurerm_container_registry" "acr" {
+  name                = var.acr_name
+  resource_group_name = var.resource_group
+  location            = var.location
+  sku                 = "Basic"
+  admin_enabled       = true
+}
+
+# Attach ACR to AKS
+resource "azurerm_role_assignment" "acr_role_assignment" {
+  principal_id   = azurerm_kubernetes_cluster.aks1.identity[0].principal_id
+  role_definition_name = "AcrPull"
+  scope           = azurerm_container_registry.acr.id
+}
+
+# Assign "Key Vault Secrets User" role to AKS Managed Identity
+resource "azurerm_role_assignment" "aks_key_vault_secrets_user" {
+  principal_id   = azurerm_kubernetes_cluster.aks1.identity[0].principal_id
+  role_definition_name = "Key Vault Secrets User"
+  scope           = azurerm_key_vault.key_vault.id
+}
+
+# Role assignments
+resource "azurerm_role_assignment" "key_vault_secrets_officer" {
+  principal_id   = var.user_principal_id
+  role_definition_name = "Key Vault Secrets Officer"
+  scope           = local.key_vault_id
+}
+
+resource "azurerm_role_assignment" "key_vault_crypto_officer" {
+  principal_id   = var.user_principal_id
+  role_definition_name = "Key Vault Crypto Officer"
+  scope           = local.key_vault_id
+}
+
+resource "azurerm_role_assignment" "key_vault_contributor" {
+  principal_id   = var.user_principal_id
+  role_definition_name = "Key Vault Contributor"
+  scope           = local.key_vault_id
+}
+
+resource "azurerm_role_assignment" "key_vault_secrets_user" {
+  principal_id   = var.user_principal_id
+  role_definition_name = "Key Vault Secrets User"
+  scope           = local.key_vault_id
+}
+
+# Create a Key Vault Secret
+resource "azurerm_key_vault_secret" "my_secret" {
+  name         = "MySecret"               # Secret Name
+  value        = "SuperSecretValue"        # Secret Value
+  key_vault_id = azurerm_key_vault.key_vault.id  # Reference to the Key Vault
+
+  depends_on = [azurerm_key_vault.key_vault]  # Ensure Key Vault is created first
+}
+
+######### Output the AKS Cluster name
+output "aks_cluster_name" {
+  value = azurerm_kubernetes_cluster.aks1.name
+}
+
+# Output the Azure Container Registry name
+output "acr_name" {
+  value = azurerm_container_registry.acr.name
+}
+
+output "vnet_id" {
+  value = azurerm_virtual_network.vnet.id
+}
+
+output "subnet1_id" {
+  value = azurerm_subnet.subnet1.id
+}
+
+output "subnet2_id" {
+  value = azurerm_subnet.subnet2.id
+}
+
+output "key_vault_name" {
+  value = azurerm_key_vault.key_vault.name
+}
+
+output "key_vault_uri" {
+  value = azurerm_key_vault.key_vault.vault_uri
+}
+
+output "acr_id" {
+  value = azurerm_container_registry.acr.id
+}
+
+# Output the Key Vault Secret Name
+output "key_vault_secret_name" {
+  value = azurerm_key_vault_secret.my_secret.name
+}
+
+# Output the Key Vault Secret ID (URI)
+output "key_vault_secret_id" {
+  value = azurerm_key_vault_secret.my_secret.id
+}

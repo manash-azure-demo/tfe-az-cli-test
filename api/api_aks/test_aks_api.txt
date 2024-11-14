@@ -1,0 +1,114 @@
+az aks get-credentials --resource-group rg_sb_eastus_221777_1_172889125416 --name mkd-aks-cls1-eus
+
+kubectl create namespace test-app
+
+kubectl create deployment nginx --image=nginx --namespace=test-app
+
+kubectl expose deployment nginx --port=80 --type=LoadBalancer --namespace=test-app
+
+kubectl get service nginx -n test-app
+
+
+You should see output like this:
+
+
+NAME    TYPE           CLUSTER-IP     EXTERNAL-IP    PORT(S)        AGE
+nginx   LoadBalancer   10.0.32.195    52.168.XX.XX   80:32478/TCP   10m
+
+
+In this example:
+- The `EXTERNAL-IP` is `52.168.XX.XX`.
+- The port is `80`.
+
+### Step 3: Set `var.service_url`
+Using the external IP address from the `kubectl` output, you can set the `service_url` variable in your Terraform configuration:
+
+hcl
+variable "service_url" {
+  description = "The URL of the service hosted in AKS to be exposed via APIM"
+  type        = string
+  default     = "http://52.168.XX.XX"
+}
+
+==================================================
+Replace `52.168.XX.XX` with the actual external IP address from your `kubectl` output.
+
+### Step 4: Apply the Terraform Configuration
+Now that `service_url` points to the Nginx service, run the Terraform commands to create the APIM instance:
+
+
+terraform init
+terraform plan
+terraform apply
+
+
+This will configure APIM to expose the `nginx` service running on your AKS cluster. You should then be able to test it using the APIM gateway URL, as described earlier.
+
+### Cleanup After Testing
+Once you've verified that the APIM is properly configured, you can delete the sample application to clean up resources:
+
+
+kubectl delete namespace test-app
+
+
+This will remove the Nginx deployment and its associated services, keeping your AKS environment clean.
+===================================================
+To test if the API Management (APIM) gateway URL is configured correctly and is routing traffic to your service hosted in the AKS cluster, you can follow these steps:
+
+### Prerequisites:
+1. **Service Deployment in AKS**: Ensure that the service in AKS is running and accessible within the AKS cluster. You might expose it as a LoadBalancer or an internal service based on your requirements.
+2. **Service URL Configuration**: Verify that the `service_url` used in the Terraform configuration points to the correct URL of the service in your AKS cluster.
+
+### Testing the Gateway URL:
+
+1. **Get the Gateway URL**:
+   - After running `terraform apply`, retrieve the gateway URL from the Terraform output:
+     
+     terraform output apim_hostname
+     
+   - You should see a URL like:
+     
+     https://mkdapim2.azure-api.net
+     
+
+2. **Check the Exposed API Path**:
+   - Based on the Terraform module, the path for the API is set to `"aks-service"`. This means that the API should be accessible at:
+     
+     https://mkdapim2.azure-api.net/aks-service
+     
+   - Replace `mkdapim2` with your actual APIM instance name if it differs.
+
+3. **Send a Test Request**:
+   - You can use `curl` or a REST client like Postman to send a request to this URL. For example, using `curl`:
+     
+     curl -X GET https://mkdapim2.azure-api.net/aks-service
+     
+   - Ensure you include any necessary headers, such as an `Ocp-Apim-Subscription-Key`, if your APIM instance requires a subscription key for access. The key can be found in the APIM portal under **Subscriptions**.
+   
+   - If an API key is required, the request might look like this:
+     
+     curl -X GET https://mkdapim2.azure-api.net/aks-service \
+          -H "Ocp-Apim-Subscription-Key: <your_subscription_key>"
+     
+
+4. **Verify the Response**:
+   - A successful response from the `curl` request or Postman should return the data from the AKS service.
+   - If the service returns the expected data, the integration is working correctly.
+   - If you receive errors like `404 Not Found`, `403 Forbidden`, or other HTTP status codes, check the following:
+     - **Service URL**: Ensure the `service_url` in your Terraform configuration is correct.
+     - **APIM Policy**: Verify that APIM policies are not blocking the request. For example, check if there's a CORS or IP restriction policy.
+     - **AKS Service Availability**: Ensure that the service in AKS is reachable and that the DNS or IP used in the `service_url` is correct.
+
+5. **Check Logs in Azure Portal**:
+   - If you encounter issues, the Azure Portal can provide insights:
+     - Navigate to your APIM instance in the Azure Portal.
+     - Go to **APIs** > **Select your API** > **Settings**.
+     - Use **Trace** to debug the requests and see where they might be failing.
+     - Also, check the **Metrics** tab to see if requests are reaching the API Management instance.
+
+### Example Troubleshooting:
+- If the API is working within the AKS cluster but not accessible through APIM:
+  - Check the `service_url` provided in the `azurerm_api_management_api` block to ensure it's pointing to the correct endpoint.
+  - Verify if APIM has the necessary network access (VNet configurations) if the AKS service is private.
+  
+By following these steps, you should be able to confirm whether the APIM gateway URL is routing traffic properly to the services in your AKS cluster.

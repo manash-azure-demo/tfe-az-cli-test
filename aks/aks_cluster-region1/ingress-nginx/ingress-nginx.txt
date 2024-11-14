@@ -1,0 +1,94 @@
+# Add the NGINX Ingress Helm repository
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+
+# Install the NGINX Ingress Controller
+helm install nginx-ingress ingress-nginx/ingress-nginx
+
+
+kubectl get pods --namespace ingress-nginx
+
+====================================App With Domain Name====================================================
+****01****
+
+aapiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: example-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx  # Add this line
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: simple-python-app-service  # Your service name
+            port:
+              number: 80  # Ensure this matches the service port
+
+****02****
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: example-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: myapp.example.com  # This is where you specify your actual domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: my-service  # The name of your service
+            port:
+              number: 80      # The port your service is listening on
+
+
+
+====================================App Without Domain Name=================================================
+aapiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: example-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx  # Add this line
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: simple-python-app-service  # Your service name
+            port:
+              number: 80  # Ensure this matches the service port
+
+==================================
+
+kubectl apply -f ingress.yaml
+
+kubectl get services --namespace ingress-nginx      #### Use the external IP to access your application at http://<external-ip>.
+
+
+TROUBLESHOOTING:
+
+kubectl logs -l app.kubernetes.io/name=ingress-nginx --namespace default
+
+kubectl get services
+
+kubectl logs -l app.kubernetes.io/name=ingress-nginx --namespace default
+
+kubectl get ingress
+
+kubectl describe ingress example-ingress
+
+
+
