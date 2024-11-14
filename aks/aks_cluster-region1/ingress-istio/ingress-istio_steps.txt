@@ -1,0 +1,28 @@
+cd E:\gitrepo\tfe-cli-test\aks\aks_cluster-region1\ingress-istio
+
+$env:Path += ";E:\gitrepo\tfe-cli-test\aks\aks_cluster-region1\ingress-istio\istio\"
+
+
+# Download the latest version of istioctl
+Invoke-WebRequest -Uri https://github.com/istio/istio/releases/download/1.18.2/istioctl-1.18.2-win.zip -OutFile istioctl.zip
+
+# Extract the zip file
+Expand-Archive .\istioctl.zip -DestinationPath .\istio
+
+# Add istioctl to your PATH (replace the path as needed)
+$env:Path += ";E:\gitrepo\tfe-cli-test\aks\aks_cluster-region1\ingress-istio\istio\"
+
+istioctl install --set profile=demo -y
+
+kubectl get pods -n istio-system
+
+kubectl label namespace default istio-injection=enabled
+
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/platform/kube/bookinfo.yaml
+
+kubectl get pods  
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.18/samples/bookinfo/networking/bookinfo-gateway.yaml
+
+kubectl get svc istio-ingressgateway -n istio-system
+
+http://<EXTERNAL-IP>/productpage  --- RUN ON BROWSER

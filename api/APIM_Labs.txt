@@ -1,0 +1,15 @@
+1. Azure Functions
+Scenario: If you are building serverless applications, you can expose Azure Functions via APIM as REST APIs.
+Integration: You can configure APIM to route API calls to Azure Functions, which can be written in multiple languages (e.g., C#, JavaScript, Python).
+
+3. Azure App Service (Web Apps or API Apps)
+Scenario: Web applications or APIs hosted in Azure App Service can be configured behind APIM.
+Integration: APIM will handle the routing, throttling, and caching, while your App Service hosts the core functionality.
+
+4. Azure Kubernetes Service (AKS)
+Scenario: If your APIs are containerized and running in AKS, you can configure APIM to expose those APIs.
+Integration: APIM can route the traffic to your microservices running in AKS, and manage things like rate limiting, authentication, and logging.
+
+7. Key Vault
+Scenario: Secure sensitive information such as API keys, certificates, and connection strings in Azure Key Vault.
+Integration: APIM can retrieve secrets securely from Key Vault and apply them within your API policies.

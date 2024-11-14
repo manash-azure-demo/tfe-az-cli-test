@@ -1,0 +1,146 @@
+# Provider Configuration
+provider "azurerm" {
+  features {}
+  subscription_id                 = var.subscription_id  # Reference from variables
+  resource_provider_registrations = "none"  # Prevent automatic resource provider registration
+}
+
+# Variables for resource names
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+  default     = "4f6a6eb9-27d0-4ed6-a31c-2bde135e2db6"  # Your subscription ID
+}
+
+variable "tenant_id" {
+  default = "82676786-5bc7-43c6-b8f8-b3ee02b0b5f3"
+}
+
+variable "aks_eus2_name" {
+  default = "mkd-aks-cls2-eus"
+}
+
+variable "node_pool2_name" {
+  default = "application2"
+}
+################################### Variable change Starts ###################################
+
+##### CHANGE THE RESOURCE GROUP HERE
+variable "resource_group" {
+  default = "rg_sb_eastus_221777_1_172682246926"
+}
+
+##### CHANGE THE Key Vault Name HERE #####
+variable "key_vault_name" {
+  type = string
+  default = "mkdakskvO"
+}
+
+################################# Variable change End ######################################
+
+variable "location" {
+  default = "eastus"
+}
+
+variable "vnet_name" {
+  default = "mkdaksVNet"
+}
+
+variable "subnet1_name" {
+  default = "subnet1"
+}
+
+variable "subnet2_name" {
+  default = "subnet2"
+}
+
+variable "nsg1_name" {
+  default = "mkdaksNSG1"
+}
+
+variable "nsg2_name" {
+  default = "mkdaksNSG2"
+}
+
+variable "route_table_name" {
+  default = "mkdaksrtn1"
+}
+
+variable "aks_name" {
+  default = "mkd-aks-cls2-eus"
+}
+
+variable "acr_name" {
+  default = "mkdaksacreus"
+}
+
+#Data sources for the existing subnets
+data "azurerm_subnet" "subnet1" {
+  name                 = var.subnet1_name
+  virtual_network_name = var.vnet_name
+  resource_group_name  = var.resource_group
+}
+
+data "azurerm_subnet" "subnet2" {
+  name                 = var.subnet2_name
+  virtual_network_name = var.vnet_name
+  resource_group_name  = var.resource_group
+}
+
+# New AKS Cluster for East US (same resource group, VNet, Subnet, NSG, etc.)
+resource "azurerm_kubernetes_cluster" "aks_eus2" {
+  name                = var.aks_eus2_name
+  location            = var.location
+  resource_group_name = var.resource_group
+  dns_prefix          = "mkdaks_eus2"
+  kubernetes_version  = "1.30.1"
+
+  default_node_pool {
+    name       = "default"
+    vm_size    = "Standard_D2as_v4"
+    node_count = 2
+    vnet_subnet_id = data.azurerm_subnet.subnet1.id
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  network_profile {
+    network_plugin = "azure"
+    service_cidr   = "10.2.0.0/16"
+    dns_service_ip = "10.2.0.10"
+  }
+}
+
+# Additional node pool for the second AKS cluster
+resource "azurerm_kubernetes_cluster_node_pool" "application" {
+  name                  = var.node_pool2_name
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks_eus2.id
+  vm_size               = "Standard_D2as_v4"
+  node_count            = 3
+  vnet_subnet_id        = data.azurerm_subnet.subnet2.id
+}
+
+# Data source for the existing Azure Container Registry (ACR)
+data "azurerm_container_registry" "acr" {
+  name                = var.acr_name
+  resource_group_name = var.resource_group
+}
+
+# Attach the existing ACR to the new AKS cluster
+resource "azurerm_role_assignment" "acr_role_assignment_aks_eus2" {
+  principal_id        = azurerm_kubernetes_cluster.aks_eus2.identity[0].principal_id
+  role_definition_name = "AcrPull"
+  scope               = data.azurerm_container_registry.acr.id
+}
+
+######### Output the AKS Cluster name########
+
+output "aks_cluster_name" {
+  value = azurerm_kubernetes_cluster.aks_eus2.name
+}
+
+output "aks_eus2_node_pool_name" {
+  value = azurerm_kubernetes_cluster_node_pool.application.name
+}

@@ -1,0 +1,8 @@
+# Use the official NGINX image as the base image
+FROM nginx:latest
+
+# Copy the content to be served by NGINX (e.g., an index.html file)
+COPY . /usr/share/nginx/html
+
+# Expose the port NGINX will listen on
+EXPOSE 80

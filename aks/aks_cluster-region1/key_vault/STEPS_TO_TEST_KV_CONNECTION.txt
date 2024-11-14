@@ -1,0 +1,16 @@
+-- az aks get-credentials --resource-group rg_sb_eastus_221777_1_172709422181 --name mkd-aks-cls2-eus
+-- kubectl apply -f keyvault-test-pod.yaml
+-- kubectl exec -it keyvault-test -- /bin/bash
+-- az login --identity --allow-no-subscriptions
+-- az keyvault secret show --vault-name mkdakseuskvP --name MySecreteuscls1
+
+If the command retrieves the secret, then the AKS cluster can access the Key Vault. i.e. "SuperSecretValue"
+
+
+-- az aks get-credentials --resource-group rg_sb_eastus_221777_1_172709422181 --name mkd-aks-cls2-eus
+-- kubectl apply -f keyvault-test-pod.yaml
+-- kubectl exec -it keyvault-test -- /bin/bash
+-- az login --identity --allow-no-subscriptions
+-- az keyvault secret show --vault-name mkdakseuskvP --name MySecreteuscls2
+
+If the command retrieves the secret, then the AKS cluster can access the Key Vault. i.e. "SuperSecretValue"
