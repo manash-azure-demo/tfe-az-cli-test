@@ -35,7 +35,7 @@ jobs:
           --name myAKSCluster \
           --location ${{ secrets.AZURE_LOCATION }} \
           --node-count 2 \
-          --enable-addons monitoring \
+          --enable-managed-identity \
           --generate-ssh-keys
 
     - name: Verify AKS Deployment
