@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: # Allows manual trigger of the workflow
+  workflow_dispatch:
 
 jobs:
   deploy-aks:
@@ -14,16 +14,15 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v3
 
-    - name: Log in to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    - name: Log in to Azure with User Credentials
+      run: |
+        az login --username ${{ secrets.AZURE_USERNAME }} --password ${{ secrets.AZURE_PASSWORD }}
 
     - name: Set up AKS Configuration
       env:
         AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
         AZURE_LOCATION: ${{ secrets.AZURE_LOCATION }}
-        AKS_CLUSTER_NAME: myAKSCluster # Change this to your desired AKS cluster name
+        AKS_CLUSTER_NAME: myAKSCluster
       run: |
         echo "Resource Group: $AZURE_RESOURCE_GROUP"
         echo "Location: $AZURE_LOCATION"
