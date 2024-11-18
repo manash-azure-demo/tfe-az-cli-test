@@ -1,0 +1,47 @@
+name: Deploy AKS Cluster
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual trigger of the workflow
+
+jobs:
+  deploy-aks:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Log in to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Set up AKS Configuration
+      env:
+        AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+        AZURE_LOCATION: ${{ secrets.AZURE_LOCATION }}
+        AKS_CLUSTER_NAME: myAKSCluster # Change this to your desired AKS cluster name
+      run: |
+        echo "Resource Group: $AZURE_RESOURCE_GROUP"
+        echo "Location: $AZURE_LOCATION"
+        echo "AKS Cluster Name: $AKS_CLUSTER_NAME"
+
+    - name: Deploy AKS Cluster
+      run: |
+        az aks create \
+          --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+          --name myAKSCluster \
+          --location ${{ secrets.AZURE_LOCATION }} \
+          --node-count 2 \
+          --enable-managed-identity \
+          --enable-addons monitoring \
+          --generate-ssh-keys
+
+    - name: Verify AKS Deployment
+      run: |
+        az aks show \
+          --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+          --name myAKSCluster
