@@ -44,11 +44,11 @@ jobs:
 
     # Step 7: Terraform Plan
     - name: Terraform Plan
-      run: terraform plan -var="resource_group=$AZURE_RESOURCE_GROUP" -var="location=$AZURE_LOCATION" -var="aks_cluster_name=$AKS_CLUSTER_NAME"
+      run: terraform plan -var-file="terraform.tfvars" -var="resource_group=$AZURE_RESOURCE_GROUP" -var="location=$AZURE_LOCATION" -var="aks_cluster_name=$AKS_CLUSTER_NAME"
 
     # Step 8: Terraform Apply
     - name: Terraform Apply
-      run: terraform apply -auto-approve -var="resource_group=$AZURE_RESOURCE_GROUP" -var="location=$AZURE_LOCATION" -var="aks_cluster_name=$AKS_CLUSTER_NAME"
+      run: terraform apply -var-file="terraform.tfvars" -auto-approve -var="resource_group=$AZURE_RESOURCE_GROUP" -var="location=$AZURE_LOCATION" -var="aks_cluster_name=$AKS_CLUSTER_NAME"
 
     # Step 9: Verify AKS Deployment
     - name: Verify AKS Deployment
