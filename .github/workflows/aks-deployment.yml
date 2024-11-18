@@ -35,7 +35,6 @@ jobs:
           --name myAKSCluster \
           --location ${{ secrets.AZURE_LOCATION }} \
           --node-count 2 \
-          --enable-managed-identity \
           --enable-addons monitoring \
           --generate-ssh-keys
 
